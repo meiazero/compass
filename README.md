@@ -1,14 +1,12 @@
-# COMPASS: Robust Feature Conformal Prediction for Medical Segmentation Metrics
+# compass
 
-This repository contains the **COMPASS 2D** code for conformal prediction on **segmentation-derived scalar metrics**.
+COMPASS intervals for an area metric on binary segmentation: the method library of
+[garimpo-uncertainty](../README.md). Fork of [matthewyccheung/compass](https://github.com/matthewyccheung/compass)
+(MIT, see `LICENSE`), adapted from the authors' medical code and paper.
 
-## Overview
+![COMPASS overview](overview.png)
 
-![COMPASS 2D overview](overview.png)
-
-## Citation
-
-If you use COMPASS in your research, please cite:
+## Attribution
 
 ```bibtex
 @article{cheung2025compass,
@@ -19,29 +17,16 @@ If you use COMPASS in your research, please cite:
 }
 ```
 
-## Quickstart (2D)
+## Contents
 
-1) Install:
+| Module | What |
+|---|---|
+| `compass2d/metrics.py` | Hard and differentiable area for a sigmoid output |
+| `compass2d/decomposition.py` | Encoder f and decoder g at a named module, via forward hooks |
+| `compass2d/directions.py` | Jacobian sum, direction `pca` (upstream's formula), direction `svm` (LinearSVC normal) |
+| `compass2d/compass.py` | Endpoint interval, binary search with a saturation flag, Algorithm 2 |
+| `compass2d/calibration.py` | Group-weighted quantile (CDF pooling), leave-one-group-out, density ratio |
 
-```bash
-pip install -r requirements-2d.txt
-```
-
-2) Prepare dataset folders and train models:
-
-- preprocessing + training helpers: `2D/datasets/<dataset>/`
-- baseline training: `python 2D/datasets/<dataset>/run_nn.py`
-- 3-head QR/CQR training: `python 2D/datasets/<dataset>/run_qrnn.py`
-
-3) Run COMPASS:
-
-- recommended (logits-only): `python 2D/run_cp_L.py`
-- full (includes Jacobians): `python 2D/run_cp.py`
-
-See `2D/README.md` for step-by-step details.
-
-## Results
-
-Outputs are written under `COMPASS_RESULTS_DIR` (default: `/scratch/yc130/compass_results`).
-
-This release intentionally does **not** include figure-generation / plotting scripts.
+The library knows nothing about datasets, clusters or SLURM, and pins no torch build: the
+application that installs it does. Install it as a uv path dependency. Check with
+`uvx ruff format --check . && uvx ruff check .`; the end-to-end test lives in the parent package.
