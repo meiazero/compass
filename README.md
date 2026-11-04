@@ -22,7 +22,6 @@ COMPASS intervals for an area metric on binary segmentation: the method library 
 | Module | What |
 |---|---|
 | `compass2d/metrics.py` | Hard and differentiable area for a sigmoid output |
-| `compass2d/decomposition.py` | Encoder f and decoder g at a named module, via forward hooks |
 | `compass2d/directions.py` | Jacobian sum, direction `pca` (upstream's formula), direction `svm` (LinearSVC normal) |
 | `compass2d/compass.py` | Endpoint interval, binary search with a saturation flag, Algorithm 2 |
 | `compass2d/calibration.py` | Group-weighted quantile (CDF pooling), leave-one-group-out, density ratio |
