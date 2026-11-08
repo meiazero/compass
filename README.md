@@ -23,9 +23,10 @@ COMPASS intervals for an area metric on binary segmentation: the method library 
 |---|---|
 | `compass2d/metrics.py` | Hard and differentiable area for a sigmoid output |
 | `compass2d/directions.py` | Jacobian sum, direction `pca` (upstream's formula), direction `svm` (LinearSVC normal) |
-| `compass2d/compass.py` | Endpoint interval, binary search with a saturation flag, Algorithm 2 |
+| `compass2d/compass.py` | Endpoint interval, symmetric and asymmetric (Algorithm 6) binary search with a saturation flag, Algorithm 2 |
 | `compass2d/calibration.py` | Group-weighted quantile (CDF pooling), repeated subsampling, leave-one-group-out, density ratio |
 
 The library knows nothing about datasets, clusters or SLURM, and pins no torch build: the
 application that installs it does. Install it as a uv path dependency. Check with
-`uvx ruff format --check . && uvx ruff check .`; the end-to-end test lives in the parent package.
+`uv run pytest -q && uvx ruff format --check . && uvx ruff check .`; the end-to-end test lives in
+the parent package.

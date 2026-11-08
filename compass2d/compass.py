@@ -1,4 +1,4 @@
-"""Symmetric endpoint COMPASS, adapted from Cheung et al. (2026), Appendix C.
+"""Symmetric and asymmetric endpoint COMPASS, adapted from Cheung et al. (2026), Appendix C.
 
 COMPASS-L and COMPASS-J share this code: L takes z = logits, decode = identity, delta = ones. A
 channel-sized delta of shape (B, C, 1, 1) broadcasts over space, so every pixel of a channel moves
@@ -20,13 +20,40 @@ def channel_delta(delta: torch.Tensor) -> torch.Tensor:
     return delta.view(delta.shape[0], -1, 1, 1)
 
 
+def shifted(
+    decode: Decode, metric: Metric, z: torch.Tensor, delta: torch.Tensor, beta: torch.Tensor
+) -> torch.Tensor:
+    """Metric at z + beta * delta, with one signed beta per sample."""
+    return metric(decode(z + beta.to(z).view(-1, 1, 1, 1) * delta))
+
+
 def endpoints(
     decode: Decode, metric: Metric, z: torch.Tensor, delta: torch.Tensor, beta: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Interval [min, max] of the metric at z -+ beta * delta, with one beta per sample."""
-    step = beta.to(z).view(-1, 1, 1, 1) * delta
-    down, up = metric(decode(z - step)), metric(decode(z + step))
+    down, up = shifted(decode, metric, z, delta, -beta), shifted(decode, metric, z, delta, beta)
     return torch.minimum(down, up), torch.maximum(down, up)
+
+
+def _bisect(
+    covers: Callable[[torch.Tensor], torch.Tensor],
+    target: torch.Tensor,
+    beta_range: float,
+    threshold: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Minimal beta for which covers(beta) holds, per sample, and whether it hit beta_range.
+
+    Like upstream, a sample never covered keeps beta_range as its score. The flag is new: a
+    saturated score understates how far the target really is, which invalidates width comparisons.
+    """
+    low = torch.zeros_like(target, dtype=torch.float64)
+    high = torch.full_like(target, beta_range, dtype=torch.float64)
+    for _ in range(math.ceil(math.log2(beta_range / threshold))):
+        middle = (low + high) / 2
+        covered = covers(middle)
+        high = torch.where(covered, middle, high)
+        low = torch.where(covered, low, middle)
+    return high, high >= beta_range
 
 
 @torch.no_grad()
@@ -39,20 +66,44 @@ def binary_search_scores(
     beta_range: float,
     threshold: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Minimal beta whose interval covers the target, and whether the search hit beta_range.
+    """Minimal beta whose interval covers the target, and whether the search hit beta_range."""
 
-    Like upstream, a sample never covered keeps beta_range as its score. The flag is new: a
-    saturated score understates how far the target really is, which invalidates width comparisons.
+    def covers(beta: torch.Tensor) -> torch.Tensor:
+        lower, upper = endpoints(decode, metric, z, delta, beta)
+        return (lower <= target) & (target <= upper)
+
+    return _bisect(covers, target, beta_range, threshold)
+
+
+@torch.no_grad()
+def asymmetric_binary_search_scores(
+    decode: Decode,
+    metric: Metric,
+    z: torch.Tensor,
+    delta: torch.Tensor,
+    target: torch.Tensor,
+    beta_range: float,
+    threshold: float,
+) -> tuple[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor]]:
+    """Algorithm 6: (score, saturated) for the lower bound, then for the upper bound.
+
+    Calibrate each side at 1 - alpha / 2 and the interval [shifted(-beta_lo), shifted(+beta_hi)]
+    covers 1 - alpha (Theorem 3). The endpoints stand in for Theorem 3's one-sided envelopes only
+    when the metric ascends along delta, which verify_monotonicity checks.
     """
-    low = torch.zeros_like(target, dtype=torch.float64)
-    high = torch.full_like(target, beta_range, dtype=torch.float64)
-    for _ in range(math.ceil(math.log2(beta_range / threshold))):
-        middle = (low + high) / 2
-        lower, upper = endpoints(decode, metric, z, delta, middle)
-        covered = (lower <= target) & (target <= upper)
-        high = torch.where(covered, middle, high)
-        low = torch.where(covered, low, middle)
-    return high, high >= beta_range
+    lower = _bisect(
+        lambda beta: shifted(decode, metric, z, delta, -beta) <= target,
+        target,
+        beta_range,
+        threshold,
+    )
+    upper = _bisect(
+        lambda beta: shifted(decode, metric, z, delta, beta) >= target,
+        target,
+        beta_range,
+        threshold,
+    )
+    return lower, upper
 
 
 @dataclass
