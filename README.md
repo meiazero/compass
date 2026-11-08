@@ -1,7 +1,7 @@
 # compass
 
-COMPASS intervals for an area metric on binary segmentation: the method library of
-[garimpo-uncertainty](../README.md). Fork of [matthewyccheung/compass](https://github.com/matthewyccheung/compass)
+COMPASS intervals for an area metric on binary segmentation, as a library for satellite imagery.
+Fork of [matthewyccheung/compass](https://github.com/matthewyccheung/compass)
 (MIT, see `LICENSE`), adapted from the authors' medical code and paper.
 
 ![COMPASS overview](overview.png)
@@ -28,5 +28,4 @@ COMPASS intervals for an area metric on binary segmentation: the method library 
 
 The library knows nothing about datasets, clusters or SLURM, and pins no torch build: the
 application that installs it does. Install it as a uv path dependency. Check with
-`uv run pytest -q && uvx ruff format --check . && uvx ruff check .`; the end-to-end test lives in
-the parent package.
+`uv run pytest -q && uvx ruff format --check . && uvx ruff check .`.
