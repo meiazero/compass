@@ -1,14 +1,12 @@
-# COMPASS: Robust Feature Conformal Prediction for Medical Segmentation Metrics
+# compass
 
-This repository contains the **COMPASS 2D** code for conformal prediction on **segmentation-derived scalar metrics**.
+COMPASS intervals for an area metric on binary segmentation, as a library for satellite imagery.
+Fork of [matthewyccheung/compass](https://github.com/matthewyccheung/compass)
+(MIT, see `LICENSE`), adapted from the authors' medical code and paper.
 
-## Overview
+![COMPASS overview](overview.png)
 
-![COMPASS 2D overview](overview.png)
-
-## Citation
-
-If you use COMPASS in your research, please cite:
+## Attribution
 
 ```bibtex
 @article{cheung2025compass,
@@ -19,29 +17,15 @@ If you use COMPASS in your research, please cite:
 }
 ```
 
-## Quickstart (2D)
+## Contents
 
-1) Install:
+| Module | What |
+|---|---|
+| `compass2d/metrics.py` | Hard and differentiable area for a sigmoid output |
+| `compass2d/directions.py` | Jacobian sum, direction `pca` (upstream's formula), direction `svm` (LinearSVC normal) |
+| `compass2d/compass.py` | Endpoint interval, symmetric and asymmetric (Algorithm 6) binary search with a saturation flag, joint asymmetric score, Algorithm 2 |
+| `compass2d/calibration.py` | Group-weighted quantile (CDF pooling), repeated subsampling, leave-one-group-out, weighted quantiles with the test point's mass at +inf (Tibshirani et al., 2019), cross-fitted density ratio, effective sample size, Mondrian quantiles per stratum |
 
-```bash
-pip install -r requirements-2d.txt
-```
-
-2) Prepare dataset folders and train models:
-
-- preprocessing + training helpers: `2D/datasets/<dataset>/`
-- baseline training: `python 2D/datasets/<dataset>/run_nn.py`
-- 3-head QR/CQR training: `python 2D/datasets/<dataset>/run_qrnn.py`
-
-3) Run COMPASS:
-
-- recommended (logits-only): `python 2D/run_cp_L.py`
-- full (includes Jacobians): `python 2D/run_cp.py`
-
-See `2D/README.md` for step-by-step details.
-
-## Results
-
-Outputs are written under `COMPASS_RESULTS_DIR` (default: `/scratch/yc130/compass_results`).
-
-This release intentionally does **not** include figure-generation / plotting scripts.
+The library knows nothing about datasets, clusters or SLURM, and pins no torch build: the
+application that installs it does. Install it as a uv path dependency. Check with
+`uv run pytest -q && uvx ruff format --check . && uvx ruff check .`.
