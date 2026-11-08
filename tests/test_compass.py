@@ -1,4 +1,4 @@
-"""Asymmetric COMPASS on synthetic logits whose errors are skewed toward underestimation."""
+"""Asymmetric COMPASS on synthetic logits whose errors are skewed."""
 
 import math
 
@@ -21,9 +21,11 @@ def area(logits: torch.Tensor) -> torch.Tensor:
 
 
 def skewed_cells(n: int, generator: torch.Generator) -> tuple[torch.Tensor, torch.Tensor]:
-    """Logits that are a noisy, downward-biased copy of the truth, and the true areas."""
+    """Noisy logits and true areas; a per-cell bias overestimates slightly and often, and
+    underestimates by a lot but rarely, so both one-sided scores carry information."""
     truth = torch.randn(n, 1, 16, 16, generator=generator) - 0.3
-    logits = truth + 0.8 * torch.randn(n, 1, 16, 16, generator=generator) - 0.4
+    bias = 0.15 - 0.3 * torch.empty(n, 1, 1, 1).exponential_(generator=generator)
+    logits = truth + 0.8 * torch.randn(n, 1, 16, 16, generator=generator) + bias
     return logits, area(truth)
 
 
