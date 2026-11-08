@@ -87,9 +87,9 @@ def asymmetric_binary_search_scores(
 ) -> tuple[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor]]:
     """Algorithm 6: (score, saturated) for the lower bound, then for the upper bound.
 
-    Calibrate each side at 1 - alpha / 2 and the interval [shifted(-beta_lo), shifted(+beta_hi)]
-    covers 1 - alpha (Theorem 3). The endpoints stand in for Theorem 3's one-sided envelopes only
-    when the metric ascends along delta, which verify_monotonicity checks.
+    Calibrate each side at 1 - alpha / 2, or both at 1 - alpha through joint_score. The endpoints
+    stand in for Theorem 3's one-sided envelopes only when the metric ascends along delta, which
+    verify_monotonicity checks.
     """
     lower = _bisect(
         lambda beta: shifted(decode, metric, z, delta, -beta) <= target,
@@ -104,6 +104,21 @@ def asymmetric_binary_search_scores(
         threshold,
     )
     return lower, upper
+
+
+def joint_score(
+    lower: tuple[torch.Tensor, torch.Tensor],
+    upper: tuple[torch.Tensor, torch.Tensor],
+    ratio: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """One score for both sides, max(beta_lo, beta_hi / ratio), and whether either side saturated.
+
+    The score is <= q exactly when [shifted(-q), shifted(+q * ratio)] covers the target, so one
+    quantile at 1 - alpha replaces Theorem 3's two at 1 - alpha / 2, which repeated subsampling
+    refuses below 2 / alpha groups. The ratio must come from cells outside the calibration set.
+    """
+    (beta_lower, lower_saturated), (beta_upper, upper_saturated) = lower, upper
+    return torch.maximum(beta_lower, beta_upper / ratio), lower_saturated | upper_saturated
 
 
 @dataclass
