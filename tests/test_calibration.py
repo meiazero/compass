@@ -1,6 +1,7 @@
 """Weighted conformal quantiles under a known covariate shift."""
 
 import numpy as np
+import pytest
 
 import compass2d.calibration
 
@@ -71,3 +72,33 @@ def test_mondrian_covers_each_stratum_where_a_pooled_quantile_does_not() -> None
         scores, groups, strata, np.array([2]), split_conformal
     )
     assert np.isinf(absent).all()
+
+
+def test_density_ratio_is_one_constant_when_nothing_shifts() -> None:
+    """Same features everywhere, groups of unequal size: every fold must agree on the ratio."""
+    calibration_groups = np.repeat(np.arange(10), 40)
+    test_groups = np.repeat(np.arange(5), [300, 100, 100, 100, 100])
+    calibration_ratio, test_ratio = compass2d.calibration.density_ratio(
+        np.zeros((len(calibration_groups), 3)),
+        np.zeros((len(test_groups), 3)),
+        calibration_groups,
+        test_groups,
+        n_folds=5,
+        seed=0,
+        n_jobs=1,
+    )
+    ratio = np.concatenate([calibration_ratio, test_ratio])
+    assert np.allclose(ratio, ratio[0])
+
+
+def test_density_ratio_refuses_a_fold_without_one_population() -> None:
+    with pytest.raises(ValueError, match="lacks one population"):
+        compass2d.calibration.density_ratio(
+            np.zeros((40, 3)),
+            np.zeros((10, 3)),
+            np.repeat(np.arange(4), 10),
+            np.zeros(10, dtype=int),
+            n_folds=5,
+            seed=0,
+            n_jobs=1,
+        )

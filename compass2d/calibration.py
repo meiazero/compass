@@ -40,9 +40,12 @@ def weighted_quantiles(
     """Per test point, the (1 - alpha) quantile of Tibshirani et al. (2019), Corollary 1.
 
     Calibration scores carry w(X_i) and the test point carries w(x) at +inf, so the quantile is
-    inf wherever the calibration has too little mass near x. Rescaling every weight changes
-    nothing, so an odds ratio without the class prior is enough.
+    inf wherever the calibration has too little mass near x. Rescaling every weight by one common
+    constant changes nothing.
     """
+    every_weight = np.concatenate([weights, np.ravel(test_weights)])
+    if not np.isfinite(every_weight).all() or (every_weight < 0).any() or weights.sum() <= 0:
+        raise ValueError("weights must be finite, non-negative and not all zero")
     order = np.argsort(scores)
     cumulative = np.cumsum(weights[order])
     total = cumulative[-1] + test_weights
@@ -140,19 +143,28 @@ def density_ratio(
     seed: int,
     n_jobs: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Odds p_test / p_calibration at every calibration and test point, from a LightGBM domain
-    classifier cross-fitted by group, so no point is scored by a classifier that saw its group."""
+    """Density ratio p_test / p_calibration at every calibration and test point.
+
+    A LightGBM domain classifier is cross-fitted by group, so no point is scored by a classifier
+    that saw its group. Each fold's odds are divided by that fold's class ratio, n_test / n_cal in
+    training, so every point shares one constant, as Tibshirani et al. (2019), Remark 3, requires.
+    """
     features = np.vstack([calibration_features, test_features])
     labels = np.concatenate([np.zeros(len(calibration_features)), np.ones(len(test_features))])
     groups = np.concatenate(
         [[f"calibration {g}" for g in calibration_groups], [f"test {g}" for g in test_groups]]
     )
-    probability = np.empty(len(labels))
+    ratio = np.empty(len(labels))
     folds = sklearn.model_selection.GroupKFold(n_splits=n_folds)
     for train, held_out in folds.split(features, labels, groups):
+        n_test = int(labels[train].sum())
+        n_calibration = len(train) - n_test
+        # A fold missing one population would score its points ~0 without failing.
+        if n_test == 0 or n_calibration == 0:
+            raise ValueError(f"a training fold lacks one population; need >= {n_folds} groups each")
         classifier = lightgbm.LGBMClassifier(
             n_estimators=100, n_jobs=n_jobs, verbosity=-1, random_state=seed
         ).fit(features[train], labels[train])
-        probability[held_out] = classifier.predict_proba(features[held_out])[:, 1]
-    odds = probability / (1 - probability + 1e-9)
-    return odds[: len(calibration_features)], odds[len(calibration_features) :]
+        probability = classifier.predict_proba(features[held_out])[:, 1]
+        ratio[held_out] = probability / (1 - probability + 1e-9) * n_calibration / n_test
+    return ratio[: len(calibration_features)], ratio[len(calibration_features) :]

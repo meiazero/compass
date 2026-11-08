@@ -116,7 +116,11 @@ def joint_score(
     The score is <= q exactly when [shifted(-q), shifted(+q * ratio)] covers the target, so one
     quantile at 1 - alpha replaces Theorem 3's two at 1 - alpha / 2, which repeated subsampling
     refuses below 2 / alpha groups. The ratio must come from cells outside the calibration set.
+    The upper side is censored at beta_range / ratio, so a quantile reaching
+    min(beta_range, beta_range / ratio) supports no finite interval.
     """
+    if not ratio > 0:
+        raise ValueError(f"ratio must be positive, got {ratio}")
     (beta_lower, lower_saturated), (beta_upper, upper_saturated) = lower, upper
     return torch.maximum(beta_lower, beta_upper / ratio), lower_saturated | upper_saturated
 
