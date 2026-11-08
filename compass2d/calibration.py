@@ -99,6 +99,26 @@ def subsampled_quantile(
     return float(candidates[p_values >= alpha - TOLERANCE].max())
 
 
+def mondrian_quantiles(
+    scores: np.ndarray,
+    groups: np.ndarray,
+    strata: np.ndarray,
+    test_strata: np.ndarray,
+    rule: Callable[[np.ndarray, np.ndarray], float],
+) -> np.ndarray:
+    """Per test point, rule(scores, groups) on the calibration points of its own stratum.
+
+    Mondrian conformal prediction (Vovk et al., 2005): coverage holds within each stratum, which
+    must be known at test time. A stratum absent from calibration bounds nothing, so it gets inf.
+    """
+    quantiles = np.full(len(test_strata), np.inf)
+    for stratum in np.unique(test_strata):
+        inside = strata == stratum
+        if inside.any():
+            quantiles[test_strata == stratum] = rule(scores[inside], groups[inside])
+    return quantiles
+
+
 def leave_one_group_out_quantiles(
     scores: np.ndarray, groups: np.ndarray, rule: Callable[[np.ndarray, np.ndarray], float]
 ) -> np.ndarray:

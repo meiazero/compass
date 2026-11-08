@@ -41,3 +41,33 @@ def test_groups_of_one_reduce_to_cell_weights() -> None:
     )
     by_cell = compass2d.calibration.weighted_quantiles(scores, ratio, test_ratio, ALPHA)
     assert np.array_equal(by_group, by_cell)
+
+
+def split_conformal(scores: np.ndarray, _groups: np.ndarray) -> float:
+    rank = int(np.ceil((1 - ALPHA) * (len(scores) + 1)))
+    return float(np.sort(scores)[rank - 1]) if rank <= len(scores) else float("inf")
+
+
+def test_mondrian_covers_each_stratum_where_a_pooled_quantile_does_not() -> None:
+    """Stratum 1 is noisier and rarer, so one pooled quantile undercovers it."""
+    rng = np.random.default_rng(3)
+
+    def draw(n: int) -> tuple[np.ndarray, np.ndarray]:
+        strata = (rng.random(n) < 0.2).astype(int)
+        return np.abs(rng.normal(0, np.where(strata == 1, 4.0, 1.0))), strata
+
+    scores, strata = draw(4000)
+    test_scores, test_strata = draw(20000)
+    groups = np.arange(len(scores))
+    q = compass2d.calibration.mondrian_quantiles(
+        scores, groups, strata, test_strata, split_conformal
+    )
+    pooled = split_conformal(scores, groups)
+    for stratum in (0, 1):
+        inside = test_strata == stratum
+        assert np.mean(test_scores[inside] <= q[inside]) >= 1 - ALPHA - 0.012
+    assert np.mean(test_scores[test_strata == 1] <= pooled) < 1 - ALPHA - 0.1
+    absent = compass2d.calibration.mondrian_quantiles(
+        scores, groups, strata, np.array([2]), split_conformal
+    )
+    assert np.isinf(absent).all()
